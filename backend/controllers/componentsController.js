@@ -1,60 +1,79 @@
 // backend/controllers/componentsController.js
 
-const Component = require('../models/Component');
 const { Op } = require('sequelize');
+const Component = require('../models/Component');
 
-const componentController = {
+module.exports = {
   async getAll(req, res) {
     try {
       const { search } = req.query;
-      const where = search ? { name: { [Op.like]: `%${search}%` } } : {};
-      const components = await Component.findAll({ where });
+      const condition = search ? { where: { name: { [Op.like]: `%${search}%` } } } : {};
+      const components = await Component.findAll(condition);
       res.json(components);
     } catch (error) {
-      res.status(500).json({ message: error.message });
+      console.error('Erro ao buscar componentes:', error);
+      res.status(500).json({ message: 'Erro ao buscar componentes.' });
     }
   },
 
   async create(req, res) {
     try {
-      const component = await Component.create(req.body);
+      const { code, name, stock } = req.body;
+
+      // Verifica se o código já existe
+      const existingComponent = await Component.findOne({ where: { code } });
+      if (existingComponent) {
+        return res.status(400).json({ message: 'Código já existe no banco de dados!' });
+      }
+
+      // Cria o componente
+      const component = await Component.create({ code, name, stock });
       res.status(201).json(component);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error('Erro ao criar componente:', error);
+      res.status(500).json({ message: 'Erro ao criar componente.' });
     }
   },
 
   async update(req, res) {
     try {
-      const [updated] = await Component.update(req.body, {
-        where: { id: req.params.id }
-      });
-      
-      if (!updated) {
-        return res.status(404).json({ message: 'Component not found' });
+      const { id } = req.params;
+      const { name, stock } = req.body;  // Pega tanto nome quanto estoque
+  
+      // Cria um objeto com os campos a serem atualizados
+      const updateData = {};
+      if (name !== undefined) updateData.name = name;
+      if (stock !== undefined) updateData.stock = stock;
+  
+      // Atualiza o componente
+      const [updatedRows] = await Component.update(updateData, { where: { id } });
+  
+      if (updatedRows === 0) {
+        return res.status(404).json({ message: 'Componente não encontrado.' });
       }
-      
-      res.status(200).json({ message: 'Component updated' });
+  
+      res.sendStatus(204);
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error('Erro ao atualizar componente:', error);
+      res.status(500).json({ message: 'Erro ao atualizar componente.' });
     }
   },
 
   async delete(req, res) {
     try {
-      const deleted = await Component.destroy({
-        where: { id: req.params.id }
-      });
-      
-      if (!deleted) {
-        return res.status(404).json({ message: 'Component not found' });
-      }
-      
-      res.status(200).json({ message: 'Component deleted' });
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  }
-};
+      const { id } = req.params;
 
-module.exports = componentController;
+      // Remove o componente
+      const deletedRows = await Component.destroy({ where: { id } });
+
+      if (deletedRows === 0) {
+        return res.status(404).json({ message: 'Componente não encontrado.' });
+      }
+
+      res.sendStatus(204);
+    } catch (error) {
+      console.error('Erro ao deletar componente:', error);
+      res.status(500).json({ message: 'Erro ao deletar componente.' });
+    }
+  },
+};

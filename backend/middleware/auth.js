@@ -1,28 +1,19 @@
 // backend/middleware/auth.js
 
-const basicAuth = require('basic-auth');
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-const authMiddleware = async (req, res, next) => {
+module.exports = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ message: 'Token não fornecido' });
+  }
+
   try {
-    const credentials = basicAuth(req);
-    
-    if (!credentials) {
-      res.setHeader('WWW-Authenticate', 'Basic');
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    const user = await User.findOne({ where: { email: credentials.name } });
-    if (!user || !await bcrypt.compare(credentials.pass, user.password)) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    req.user = user;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
     next();
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    return res.status(401).json({ message: 'Token inválido' });
   }
 };
-
-module.exports = authMiddleware;
